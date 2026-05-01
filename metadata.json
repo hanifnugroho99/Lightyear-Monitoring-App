@@ -1,0 +1,6 @@
+{
+  "name": "LIGHTYEAR Intern Management",
+  "description": "A professional clock-in/out and task management system for LIGHTYEAR digital agency interns with Google Login, GPS tracking, and PDF reports.",
+  "requestFramePermissions": ["geolocation", "camera"],
+  "majorCapabilities": []
+}

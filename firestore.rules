@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUser(data, pathUserId) {
+      let keys = data.keys();
+      return keys.hasAll(['uid', 'email', 'role']) && 
+             keys.size() <= 12 &&
+             data.uid == pathUserId &&
+             data.role in ['admin', 'employee'] &&
+             (data.get('displayName', '') is string && data.get('displayName', '').size() <= 100) &&
+             (data.get('photoURL', null) == null || (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 600)) &&
+             (data.get('onboarded', true) is bool) &&
+             (data.get('createdAt', request.time) is timestamp);
+    }
+
+    function isValidAttendance(data) {
+      return data.keys().hasAll(['userId', 'type', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.type in ['clock-in', 'clock-out'] &&
+             data.timestamp == request.time &&
+             (data.userName is string && data.userName.size() <= 100) &&
+             (data.get('photo', null) == null || data.get('photo', '') is string) &&
+             (data.location == null || (
+               data.location.latitude is number && 
+               data.location.longitude is number
+             ));
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['title', 'assignedTo', 'status']) &&
+             data.title is string && data.title.size() <= 200 &&
+             data.assignedTo is string && data.assignedTo.size() <= 128 &&
+             data.status in ['todo', 'in-progress', 'done'] &&
+             (data.progress == null || (data.progress is number && data.progress >= 0 && data.progress <= 100)) &&
+             (data.assignedToName == null || (data.assignedToName is string && data.assignedToName.size() <= 100)) &&
+             (data.adminId == null || (data.adminId is string && data.adminId.size() <= 128));
+    }
+
+    function isValidLeaveRequest(data) {
+      return data.keys().hasAll(['userId', 'type', 'startDate', 'endDate', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.type in ['sick', 'vacation', 'other'] &&
+             data.status == 'pending' &&
+             (data.userName is string && data.userName.size() <= 100) &&
+             (data.startDate is string && data.startDate.size() <= 100) &&
+             (data.endDate is string && data.endDate.size() <= 100) &&
+             (data.reason == null || (data.reason is string && data.reason.size() <= 1000));
+    }
+
+    // --- Collections ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isAdmin();
+      allow create: if isEmailVerified() && isValidUser(incoming(), userId) && 
+                    userId == request.auth.uid &&
+                    incoming().email == request.auth.token.email;
+      allow update: if isEmailVerified() && isValidUser(incoming(), userId) && (
+        (isOwner(userId) && incoming().email == existing().email && incoming().role == existing().role) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow get: if (isAdmin() || resource.data.userId == request.auth.uid) && isValidId(attendanceId);
+      allow list: if isAdmin() || resource.data.userId == request.auth.uid;
+      allow create: if isEmailVerified() && isValidAttendance(incoming());
+      allow update, delete: if false;
+    }
+
+    match /tasks/{taskId} {
+      allow get: if (isAdmin() || resource.data.assignedTo == request.auth.uid) && isValidId(taskId);
+      allow list: if isAdmin() || resource.data.assignedTo == request.auth.uid;
+      allow create: if isAdmin() && isEmailVerified() && isValidTask(incoming());
+      allow update: if isEmailVerified() && (
+        (isAdmin() && isValidTask(incoming())) ||
+        (isOwner(resource.data.assignedTo) && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status']) &&
+         incoming().progress is number && incoming().progress >= 0 && incoming().progress <= 100 &&
+         incoming().status in ['todo', 'in-progress', 'done'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /leave_requests/{requestId} {
+      allow get: if (isAdmin() || resource.data.userId == request.auth.uid) && isValidId(requestId);
+      allow list: if isAdmin() || resource.data.userId == request.auth.uid;
+      allow create: if isEmailVerified() && isValidLeaveRequest(incoming());
+      allow update: if isEmailVerified() && (
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+         incoming().status in ['approved', 'rejected']) ||
+        (isOwner(resource.data.userId) && existing().status == 'pending' && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+         incoming().status == 'cancelled')
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /whitelist/{email} {
+      allow get: if isSignedIn() && request.auth.token.email == email && isValidId(email);
+      allow list: if false;
+      allow write: if false;
+    }
+  }
+}

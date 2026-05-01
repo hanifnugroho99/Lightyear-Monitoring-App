@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents an agency member (Admin or Employee)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "employee"] },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "onboarded": { "type": "boolean" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "A clock-in or clock-out event",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "type": { "type": "string", "enum": ["clock-in", "clock-out"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" },
+            "address": { "type": "string" }
+          }
+        }
+      },
+      "required": ["userId", "type", "timestamp"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task assigned to an intern",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "assignedToName": { "type": "string" },
+        "progress": { "type": "number" },
+        "status": { "type": "string", "enum": ["todo", "in-progress", "done"] },
+        "deadline": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "adminId": { "type": "string" }
+      },
+      "required": ["title", "assignedTo", "status"]
+    },
+    "LeaveRequest": {
+      "title": "LeaveRequest",
+      "description": "A request for time off",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "type": { "type": "string", "enum": ["sick", "vacation", "other"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "startDate", "endDate", "status"]
+    },
+    "Whitelist": {
+      "title": "Whitelist",
+      "description": "Allowed emails for the system",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "employee"] }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Users of the system"
+    },
+    "/attendance/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Attendance logs"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Assigned tasks"
+    },
+    "/leave_requests/{requestId}": {
+      "schema": "LeaveRequest",
+      "description": "Leave requests"
+    },
+    "/whitelist/{email}": {
+      "schema": "Whitelist",
+      "description": "Whitelisted emails for registration"
+    }
+  }
+}

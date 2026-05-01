@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-primary: #2563eb;
+  --color-brand-secondary: #4f46e5;
+  --color-bg-main: #f8fafc;
+  --color-bg-card: #ffffff;
+  --color-border-main: #e2e8f0;
+  --color-border-light: #f1f5f9;
+}
+
+@layer base {
+  body {
+    @apply bg-bg-main text-slate-900 font-sans antialiased selection:bg-brand-primary/10;
+  }
+}
+
+.bento-grid {
+  @apply grid grid-cols-1 md:grid-cols-12 gap-4 auto-rows-min;
+}
+
+.bento-card {
+  @apply bg-bg-card border border-border-main rounded-2xl p-6 shadow-sm transition-all hover:shadow-md;
+}
+
+.btn-primary {
+  @apply px-4 py-2 bg-brand-primary text-white font-semibold rounded-lg transition-all hover:bg-brand-primary/90 active:scale-95 disabled:opacity-50 shadow-sm shadow-blue-200;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-white border border-border-main text-slate-600 font-semibold rounded-lg transition-all hover:bg-slate-50 active:scale-95 disabled:opacity-50;
+}
+
+.input-field {
+  @apply w-full bg-white border border-border-main rounded-lg px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-brand-primary focus:ring-1 focus:ring-brand-primary outline-none transition-all;
+}
+
+.badge-success {
+  @apply px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-bold uppercase tracking-wider;
+}
+
+.badge-warning {
+  @apply px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-bold uppercase tracking-wider;
+}
+
+.badge-error {
+  @apply px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-bold uppercase tracking-wider;
+}
+
+.badge-info {
+  @apply px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold uppercase tracking-wider;
+}
