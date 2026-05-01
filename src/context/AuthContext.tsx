@@ -51,8 +51,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loginWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    try {
+      const provider = new GoogleAuthProvider();
+      // Ensure we explicitly set language to browser default
+      auth.useDeviceLanguage();
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
+      console.error('Login Error:', error);
+      if (error.code === 'auth/unauthorized-domain') {
+        alert('This domain is not authorized in the Firebase Console. \n\nPlease go to Firebase Console > Authentication > Settings > Authorized Domains and add your Vercel domain.');
+      } else if (error.code === 'auth/popup-blocked') {
+        alert('Sign-in popup was blocked by your browser. Please allow popups for this site.');
+      } else {
+        alert(`Authentication failed: ${error.message}`);
+      }
+      throw error;
+    }
   };
 
   const logout = async () => {
