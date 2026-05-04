@@ -12,29 +12,29 @@ export function CameraCapture({ onCapture, isActive }: CameraCaptureProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isActive && !stream) {
-      startCamera();
-    } else if (!isActive && stream) {
-      stopCamera();
-    }
-
-    return () => stopCamera();
-  }, [isActive]);
+  const [error, setError] = useState<string | null>(null);
 
   const startCamera = async () => {
+    setError(null);
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API not supported in this browser");
+      }
+
       const s = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user', width: 640, height: 480 }, 
         audio: false 
       });
       setStream(s);
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Camera access denied", err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setError("Camera permission denied. Please allow camera access in your browser settings and try again.");
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError("No camera found on this device.");
+      } else {
+        setError(err.message || "Could not access camera.");
+      }
     }
   };
 
@@ -44,6 +44,28 @@ export function CameraCapture({ onCapture, isActive }: CameraCaptureProps) {
       setStream(null);
     }
   };
+
+  useEffect(() => {
+    if (isActive && !stream && !capturedImage && !error) {
+      startCamera();
+    }
+    
+    if (!isActive && stream) {
+      stopCamera();
+    }
+  }, [isActive, stream, capturedImage, error]);
+
+  // Ensure srcObject is set when videoRef becomes available
+  useEffect(() => {
+    if (videoRef.current && stream && !capturedImage) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(e => console.error("Video play failed:", e));
+    }
+  }, [stream, capturedImage]);
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, [stream]);
 
   const capture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -71,8 +93,19 @@ export function CameraCapture({ onCapture, isActive }: CameraCaptureProps) {
 
   return (
     <div className="space-y-4">
-      <div className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-inner border-2 border-slate-800">
-        {!capturedImage ? (
+      <div className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-inner border-2 border-slate-800 flex items-center justify-center">
+        {error ? (
+          <div className="p-8 text-center space-y-4">
+            <p className="text-red-400 text-sm font-medium">{error}</p>
+            <button 
+              onClick={startCamera}
+              className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-700 transition-colors flex items-center gap-2 mx-auto"
+            >
+              <RefreshCcw className="w-4 h-4" />
+              Retry Access
+            </button>
+          </div>
+        ) : !capturedImage ? (
           <video 
             ref={videoRef} 
             autoPlay 
@@ -84,28 +117,32 @@ export function CameraCapture({ onCapture, isActive }: CameraCaptureProps) {
           <img src={capturedImage} alt="Captured" className="w-full h-full object-cover" />
         )}
         
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4">
-          {!capturedImage ? (
-            <button 
-              onClick={capture}
-              className="w-14 h-14 rounded-full bg-white text-brand-primary flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all"
-            >
-              <Camera className="w-6 h-6" />
-            </button>
-          ) : (
-            <button 
-              onClick={reset}
-              className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all"
-            >
-              <RefreshCcw className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-        
-        {capturedImage && (
-          <div className="absolute top-4 right-4 bg-green-500 text-white p-2 rounded-full shadow-lg">
-            <Check className="w-4 h-4" />
-          </div>
+        {!error && (
+          <>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4">
+              {!capturedImage ? (
+                <button 
+                  onClick={capture}
+                  className="w-14 h-14 rounded-full bg-white text-brand-primary flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all"
+                >
+                  <Camera className="w-6 h-6" />
+                </button>
+              ) : (
+                <button 
+                  onClick={reset}
+                  className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center shadow-xl hover:scale-110 active:scale-95 transition-all"
+                >
+                  <RefreshCcw className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            
+            {capturedImage && (
+              <div className="absolute top-4 right-4 bg-green-500 text-white p-2 rounded-full shadow-lg">
+                <Check className="w-4 h-4" />
+              </div>
+            )}
+          </>
         )}
       </div>
       

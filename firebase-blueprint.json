@@ -77,6 +77,22 @@
         "role": { "type": "string", "enum": ["admin", "employee"] }
       },
       "required": ["email", "role"]
+    },
+    "DailyReport": {
+      "title": "DailyReport",
+      "description": "Daily work report submitted by an intern before clock-out",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "workDescription": { "type": "string" },
+        "workLink": { "type": "string" },
+        "objectiveId": { "type": "string" },
+        "objectiveTitle": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "date": { "type": "string" }
+      },
+      "required": ["userId", "workDescription", "objectiveId", "timestamp", "date"]
     }
   },
   "firestore": {
@@ -99,6 +115,10 @@
     "/whitelist/{email}": {
       "schema": "Whitelist",
       "description": "Whitelisted emails for registration"
+    },
+    "/daily_reports/{reportId}": {
+      "schema": "DailyReport",
+      "description": "Daily work reports"
     }
   }
 }

@@ -66,13 +66,12 @@ service cloud.firestore {
     }
 
     function isValidTask(data) {
-      return data.keys().hasAll(['title', 'assignedTo', 'status']) &&
-             data.title is string && data.title.size() <= 200 &&
-             data.assignedTo is string && data.assignedTo.size() <= 128 &&
-             data.status in ['todo', 'in-progress', 'done'] &&
-             (data.progress == null || (data.progress is number && data.progress >= 0 && data.progress <= 100)) &&
-             (data.assignedToName == null || (data.assignedToName is string && data.assignedToName.size() <= 100)) &&
-             (data.adminId == null || (data.adminId is string && data.adminId.size() <= 128));
+      return (data.get('title', '') is string && data.get('title', '').size() <= 200) &&
+             (data.get('assignedTo', '') is string && data.get('assignedTo', '').size() <= 128) &&
+             (data.get('status', 'todo') in ['todo', 'in-progress', 'done', 'cancelled']) &&
+             (data.get('progress', 0) is number) &&
+             (data.get('briefDescription', '') is string && data.get('briefDescription', '').size() <= 5000) &&
+             (data.get('briefAttachments', []) is list);
     }
 
     function isValidLeaveRequest(data) {
@@ -81,9 +80,22 @@ service cloud.firestore {
              data.type in ['sick', 'vacation', 'other'] &&
              data.status == 'pending' &&
              (data.userName is string && data.userName.size() <= 100) &&
-             (data.startDate is string && data.startDate.size() <= 100) &&
-             (data.endDate is string && data.endDate.size() <= 100) &&
+             (data.startDate is timestamp) &&
+             (data.endDate is timestamp) &&
              (data.reason == null || (data.reason is string && data.reason.size() <= 1000));
+    }
+
+    function isValidDailyReport(data) {
+      return data.keys().hasAll(['userId', 'workDescription', 'objectiveId', 'timestamp', 'date']) &&
+             data.keys().size() <= 10 &&
+             data.userId == request.auth.uid &&
+             data.workDescription is string && data.workDescription.size() <= 5000 &&
+             data.objectiveId is string && data.objectiveId.size() <= 128 &&
+             data.timestamp == request.time &&
+             data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+             (data.workLink == null || (data.workLink is string && data.workLink.size() <= 1000)) &&
+             (data.objectiveTitle == null || (data.objectiveTitle is string && data.objectiveTitle.size() <= 200)) &&
+             (data.userName == null || (data.userName is string && data.userName.size() <= 100));
     }
 
     // --- Collections ---
@@ -109,15 +121,17 @@ service cloud.firestore {
     }
 
     match /tasks/{taskId} {
-      allow get: if (isAdmin() || resource.data.assignedTo == request.auth.uid) && isValidId(taskId);
-      allow list: if isAdmin() || resource.data.assignedTo == request.auth.uid;
-      allow create: if isAdmin() && isEmailVerified() && isValidTask(incoming());
+      allow get: if (isAdmin() || isEmailVerified()) && isValidId(taskId);
+      allow list: if isAdmin() || isEmailVerified();
+      allow create: if isAdmin() && isEmailVerified() && 
+                    incoming().keys().hasAll(['title', 'assignedTo', 'status']) &&
+                    isValidTask(incoming());
       allow update: if isEmailVerified() && (
         (isAdmin() && isValidTask(incoming())) ||
         (isOwner(resource.data.assignedTo) && 
-         incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status']) &&
-         incoming().progress is number && incoming().progress >= 0 && incoming().progress <= 100 &&
-         incoming().status in ['todo', 'in-progress', 'done'])
+         incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status', 'updatedAt']) &&
+         incoming().get('progress', 0) is number &&
+         incoming().get('status', 'todo') in ['todo', 'in-progress', 'done'])
       );
       allow delete: if isAdmin();
     }
@@ -127,10 +141,10 @@ service cloud.firestore {
       allow list: if isAdmin() || resource.data.userId == request.auth.uid;
       allow create: if isEmailVerified() && isValidLeaveRequest(incoming());
       allow update: if isEmailVerified() && (
-        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
          incoming().status in ['approved', 'rejected']) ||
         (isOwner(resource.data.userId) && existing().status == 'pending' && 
-         incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
          incoming().status == 'cancelled')
       );
       allow delete: if isAdmin();
@@ -140,6 +154,17 @@ service cloud.firestore {
       allow get: if isSignedIn() && request.auth.token.email == email && isValidId(email);
       allow list: if false;
       allow write: if false;
+    }
+
+    match /daily_reports/{reportId} {
+      allow get: if (isAdmin() || resource.data.userId == request.auth.uid) && isValidId(reportId);
+      allow list: if isAdmin() || resource.data.userId == request.auth.uid;
+      allow create: if isEmailVerified() && isValidDailyReport(incoming());
+      allow update: if isEmailVerified() && 
+                      resource.data.userId == request.auth.uid && 
+                      isValidDailyReport(incoming()) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['workDescription', 'workLink', 'objectiveId', 'objectiveTitle', 'timestamp']);
+      allow delete: if isAdmin();
     }
   }
 }

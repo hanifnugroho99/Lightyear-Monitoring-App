@@ -1,23 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Clock, MapPin, CheckCircle, ArrowRight, ClipboardList, Calendar, Rocket } from 'lucide-react';
-import { motion } from 'motion/react';
-import { collection, addDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { Clock, MapPin, CheckCircle, ArrowRight, ClipboardList, Calendar, Rocket, FileText } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { collection, addDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { handleFirestoreError, OperationType } from '../../lib/errorHandlers';
 import { AttendanceRecord, Task } from '../../types';
 import { format } from 'date-fns';
 import { CameraCapture } from '../../components/CameraCapture';
 import { X, Camera as CameraIcon } from 'lucide-react';
+import { DailyReportForm } from '../../components/DailyReportForm';
 
 export function EmployeeDashboard() {
   const { profile } = useAuth();
   const [lastAttendance, setLastAttendance] = useState<AttendanceRecord | null>(null);
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [hasSubmittedReportToday, setHasSubmittedReportToday] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -37,6 +39,19 @@ export function EmployeeDashboard() {
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'attendance');
     });
+
+    // Check if report submitted today
+    const checkReport = async () => {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const reportQuery = query(
+        collection(db, 'daily_reports'),
+        where('userId', '==', profile.uid),
+        where('date', '==', today)
+      );
+      const snap = await getDocs(reportQuery);
+      setHasSubmittedReportToday(!snap.empty);
+    };
+    checkReport();
 
     // Get active tasks
     const tasksQuery = query(
@@ -67,18 +82,30 @@ export function EmployeeDashboard() {
       return;
     }
 
+    // For clock-out, require daily report
+    if (type === 'clock-out' && !hasSubmittedReportToday) {
+      setShowReportForm(true);
+      return;
+    }
+
     setLoading(true);
     try {
       let geo: { latitude: number; longitude: number } | undefined;
       
       if (navigator.geolocation) {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject);
-        });
-        geo = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        };
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+          });
+          geo = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+        } catch (geoErr: any) {
+          console.warn("Geolocation denied or timed out", geoErr);
+          // Don't block clock-in if geo fails, but inform user if needed
+          // Or we can choose to require it. For now, let's just log it.
+        }
       }
 
       await addDoc(collection(db, 'attendance'), {
@@ -103,6 +130,25 @@ export function EmployeeDashboard() {
 
   return (
     <div className="space-y-8">
+      <AnimatePresence>
+        {showReportForm && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto shadow-2xl">
+            <div className="min-h-full flex items-center justify-center w-full py-8">
+              <DailyReportForm 
+                userId={profile?.uid || ''} 
+                userName={profile?.displayName || ''} 
+                tasks={activeTasks}
+                onSuccess={() => {
+                  setHasSubmittedReportToday(true);
+                  setShowReportForm(false);
+                }}
+                onCancel={() => setShowReportForm(false)}
+              />
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900">Intern Dashboard</h2>
@@ -158,12 +204,12 @@ export function EmployeeDashboard() {
           ) : (
             <>
               <div className="absolute top-0 right-0 p-4 opacity-10">
-                <Clock className="w-40 h-40" />
+                <Clock className="w-40 h-40" style={{ color: '#473333' }} />
               </div>
               
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-[0.2em] opacity-80 mb-1">Telemetry Status</h3>
-                <p className="text-xs font-mono mb-8">
+              <div className="text-black">
+                <h3 className="text-sm font-bold uppercase tracking-[0.2em] opacity-80 mb-1 text-black">Telemetry Status</h3>
+                <p className="text-xs font-mono mb-8 text-black">
                    {isClockedIn ? 'TRANSMITTING :: ACTIVE' : 'STANDBY :: INACTIVE'}
                 </p>
                 
@@ -171,9 +217,15 @@ export function EmployeeDashboard() {
                   {format(new Date(), 'HH:mm')}
                 </div>
                 {lastAttendance && (
-                   <p className="text-xs opacity-70 mb-8 font-medium">
+                   <p className="text-xs opacity-70 mb-8 font-medium text-black">
                      Last {lastAttendance.type === 'clock-in' ? 'check-in' : 'check-out'} at {format(lastAttendance.timestamp?.toDate() || new Date(), 'p')}
                    </p>
+                )}
+                {isClockedIn && (
+                  <div className={`mt-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider ${hasSubmittedReportToday ? 'text-green-900 bg-green-500/20' : 'text-blue-900 bg-white/40'} px-3 py-1.5 rounded-full w-fit`}>
+                    <FileText className="w-3 h-3" />
+                    {hasSubmittedReportToday ? 'Report Submitted' : 'Daily Report Pending'}
+                  </div>
                 )}
               </div>
 

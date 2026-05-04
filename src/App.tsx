@@ -12,6 +12,7 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { Personnel } from './pages/admin/Personnel';
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 import { Attendance } from './pages/shared/Attendance';
+import { Reports } from './pages/shared/Reports';
 import { Tasks } from './pages/shared/Tasks';
 import { LeaveRequests } from './pages/shared/LeaveRequests';
 import { useAuth } from './context/AuthContext';
@@ -44,6 +45,7 @@ export default function App() {
           />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/attendance" element={<Attendance />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/leave-requests" element={<LeaveRequests />} />
           

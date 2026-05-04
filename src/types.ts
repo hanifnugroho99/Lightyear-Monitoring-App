@@ -28,6 +28,8 @@ export interface Task {
   id?: string;
   title: string;
   description: string;
+  briefDescription?: string;
+  briefAttachments?: { name: string, url: string, type: string }[];
   assignedTo: string;
   assignedToName: string;
   progress: number;
@@ -52,4 +54,16 @@ export interface LeaveRequest {
 export interface WhitelistEntry {
   email: string;
   role: Role;
+}
+
+export interface DailyReport {
+  id?: string;
+  userId: string;
+  userName: string;
+  workDescription: string;
+  workLink: string;
+  objectiveId: string;
+  objectiveTitle: string;
+  timestamp: any;
+  date: string; // YYYY-MM-DD for uniqueness check
 }

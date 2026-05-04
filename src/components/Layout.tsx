@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Rocket, Clock, CheckSquare, Users, LayoutDashboard, Calendar, ShieldCheck } from 'lucide-react';
+import { LogOut, Rocket, Clock, CheckSquare, Users, LayoutDashboard, Calendar, ShieldCheck, FileText } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 
@@ -13,6 +13,7 @@ export function Layout() {
     { name: 'Attendance', path: '/attendance', icon: Clock },
     { name: 'Tasks', path: '/tasks', icon: CheckSquare },
     { name: 'Leave', path: '/leave-requests', icon: Calendar },
+    { name: 'Reports', path: '/reports', icon: FileText },
     ...(profile?.role === 'admin' ? [
       { name: 'Personnel', path: '/admin/personnel', icon: ShieldCheck }
     ] : []),
